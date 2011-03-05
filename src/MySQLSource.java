@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.logging.Level;
 
 /**
@@ -14,11 +15,12 @@ import java.util.logging.Level;
  */
 public class MySQLSource extends DataSource {
 
-    private String table_groups, table_users, table_items, table_kits, table_warps, table_homes, table_reservelist, table_whitelist, table_bans;
+    private String table_groups, table_users, table_items, table_kits, table_warps, table_homes, table_reservelist, table_whitelist, table_bans, table_webui;
 
     public void initialize() {
         PropertiesFile properties = new PropertiesFile("mysql.properties");
         table_groups = properties.getString("groups", "groups");
+        table_webui = properties.getString("webui-auths", "webui");
         table_users = properties.getString("users", "users");
         table_items = properties.getString("items", "items");
         table_kits = properties.getString("kits", "kits");
@@ -32,6 +34,7 @@ public class MySQLSource extends DataSource {
         loadHomes();
         loadWarps();
         loadItems();
+		loadWebUiAuths();
         // loadBanList();
     }
 
@@ -76,6 +79,37 @@ public class MySQLSource extends DataSource {
             }
         }
     }
+
+	public void loadWebUiAuths () {
+		synchronized (webUiAuthLock) {
+            Connection conn = null;
+            PreparedStatement ps = null;
+            ResultSet rs = null;
+            try {
+                conn = etc.getSQLConnection();
+                groups = new ArrayList<Group>();
+                ps = conn.prepareStatement("SELECT * FROM " + table_webui);
+                rs = ps.executeQuery();
+
+				webUiAuths = new Hashtable<String,String>();
+                while (rs.next()) {
+                    webUiAuths.put(rs.getString("username"), rs.getString("password"));
+                }
+            } catch (SQLException ex) {
+                log.log(Level.SEVERE, "Unable to retreive WebUI auths from WebUI table", ex);
+            } finally {
+                try {
+                    if (ps != null)
+                        ps.close();
+                    if (rs != null)
+                        rs.close();
+                    if (conn != null)
+                        conn.close();
+                } catch (SQLException ex) {
+                }
+            }
+		}
+	}
 
     public void loadKits() {
         synchronized (kitLock) {
@@ -752,4 +786,5 @@ public class MySQLSource extends DataSource {
             }
         }
     }
+
 }

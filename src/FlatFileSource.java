@@ -6,6 +6,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.Scanner;
 import java.util.logging.Level;
 
@@ -23,6 +24,7 @@ public class FlatFileSource extends DataSource {
         loadWarps();
         loadItems();
         // loadBanList();
+		loadWebUiAuths();
 
         String location = etc.getInstance().getUsersLocation();
         if (!new File(location).exists()) {
@@ -69,6 +71,48 @@ public class FlatFileSource extends DataSource {
             }
         }
     }
+
+	public void loadWebUiAuths () {
+		String location = etc.getInstance().getWebUiLoc();
+
+        if (!new File(location).exists()) {
+            FileWriter writer = null;
+            try {
+                writer = new FileWriter(location);
+                writer.write("#Add your login for the WebUI here (When adding your entry DO NOT include #!)\r\n");
+                writer.write("#Examples:\r\n");
+                writer.write("#username:password\r\n");
+            } catch (Exception e) {
+                log.log(Level.SEVERE, "Exception while creating " + location, e);
+            } finally {
+                try {
+                    if (writer != null)
+                        writer.close();
+                } catch (IOException e) {
+                    log.log(Level.SEVERE, "Exception while closing writer for " + location, e);
+                }
+            }
+        }
+
+        synchronized (webUiAuthLock) {
+            webUiAuths = new Hashtable<String,String>();
+            try {
+                Scanner scanner = new Scanner(new File(location));
+                while (scanner.hasNextLine()) {
+                    String line = scanner.nextLine();
+                    if (line.startsWith("#"))
+                        continue;
+                    if (line.equals(""))
+                        continue;
+                    String[] split = line.split(":");
+                    webUiAuths.put(split[0], split[1]);
+                }
+                scanner.close();
+            } catch (Exception e) {
+                log.log(Level.SEVERE, "Exception while reading " + location + " (Are you sure you formatted it correctly?)", e);
+            }
+        }
+	}
 
     public void loadGroups() {
         String location = etc.getInstance().getGroupLocation();

@@ -9,13 +9,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import net.minecraft.server.MinecraftServer;
+import org.json.simple.JSONAware;
+import org.json.simple.JSONObject;
 
 /**
  * Player.java - Interface for eo so mods don't have to update often.
  * 
  * @author James
  */
-public class Player extends HumanEntity implements MessageReceiver {
+public class Player extends HumanEntity implements MessageReceiver, JSONAware {
 
     private static final Logger log                = Logger.getLogger("Minecraft");
     private int                 id                 = -1;
@@ -40,6 +42,29 @@ public class Player extends HumanEntity implements MessageReceiver {
     public Player(OEntityPlayerMP player) {
         setUser(player);
     }
+
+	public String toJSONString () {
+		JSONObject o = new JSONObject();
+
+		o.put("name", getName());
+		o.put("isAdmin", getAdmin());
+		o.put("canBuild", canBuild());
+		o.put("canIgnoreRestrictions", canIgnoreRestrictions());
+		o.put("canModifyWorld", canModifyWorld());
+		o.put("isMuted", isMuted());
+		o.put("color", getColor());
+		o.put("health", getHealth());
+		o.put("ip", getIP());
+		o.put("itemInHand", getItemInHand());
+		o.put("x", getX());
+		o.put("y", getY());
+		o.put("z", getZ());
+		o.put("yaw", getRotation());
+		o.put("pitch", getPitch());
+		o.put("prefix", getPrefix());
+
+		return o.toJSONString();
+	}
 
     /**
      * Returns the entity we're wrapping.

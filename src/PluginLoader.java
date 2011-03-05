@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import net.hey0.hMod.HttpStream;
 
 import net.minecraft.server.MinecraftServer;
 
@@ -483,8 +484,9 @@ public class PluginLoader {
             PluginListener listener = null;
             try {
                 List<PluginRegisteredListener> registeredListeners = listeners.get(h.ordinal());
+
                 for (PluginRegisteredListener regListener : registeredListeners) {
-                    if (!regListener.getPlugin().isEnabled())
+                    if (regListener.getPlugin() != null && !regListener.getPlugin().isEnabled())
                         continue;
 
                     listener = regListener.getListener();

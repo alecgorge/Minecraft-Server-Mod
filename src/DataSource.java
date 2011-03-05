@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -15,21 +16,28 @@ import net.minecraft.server.MinecraftServer;
  */
 public abstract class DataSource {
 
-    protected static final Logger  log    = Logger.getLogger("Minecraft");
-    protected List<Group>          groups = new ArrayList<Group>();
-    protected List<Kit>            kits   = new ArrayList<Kit>();
-    protected List<Warp>           homes  = new ArrayList<Warp>();
-    protected List<Warp>           warps  = new ArrayList<Warp>();
-    protected List<Ban>            bans   = new ArrayList<Ban>();
-    protected Map<String, Integer> items  = new HashMap<String, Integer>();
+    protected static final Logger  log			= Logger.getLogger("Minecraft");
+    protected List<Group>          groups		= new ArrayList<Group>();
+    protected List<Kit>            kits			= new ArrayList<Kit>();
+    protected List<Warp>           homes		= new ArrayList<Warp>();
+    protected List<Warp>           warps		= new ArrayList<Warp>();
+    protected List<Ban>            bans			= new ArrayList<Ban>();
+    protected Map<String, Integer> items		= new HashMap<String, Integer>();
+    protected Hashtable<String,String> webUiAuths	= new Hashtable<String,String>();
     protected MinecraftServer      server;
-    protected final Object         groupLock = new Object(), kitLock = new Object(), banLock = new Object();
-    protected final Object         homeLock  = new Object(), warpLock = new Object(), itemLock = new Object();
+    protected final Object         groupLock	= new Object(), kitLock = new Object(), banLock = new Object();
+    protected final Object         homeLock		= new Object(), warpLock = new Object(), itemLock = new Object();
+	protected final Object		   webUiAuthLock= new Object();
 
     /**
      * Initializes the data source
      */
     abstract public void initialize();
+
+	/**
+	 * Loads all WebUI auths
+	 */
+	abstract public void loadWebUiAuths();
 
     /**
      * Loads all groups
@@ -177,6 +185,12 @@ public abstract class DataSource {
             return kits.size() > 0;
         }
     }
+
+	public Hashtable<String,String> getWebUiAuths () {
+		synchronized (webUiAuthLock) {
+			return webUiAuths;
+		}
+	}
 
     /**
      * Returns a list of all kits names separated by commas

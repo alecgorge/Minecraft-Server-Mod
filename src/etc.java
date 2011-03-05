@@ -2,15 +2,25 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import net.hey0.hMod.*;
 
 import net.minecraft.server.MinecraftServer;
 
@@ -50,13 +60,28 @@ public class etc {
     private boolean                       showUnknownCommand  = true;
     private String                        versionStr;
     private boolean                       tainted             = true;
-    // Version, DO NOT CHANGE (is loaded from file version.txt)!
+    // Version, DO NOT CHANGE (it is loaded from file version.txt)!
     private int                           version             = 1;
     private String                        username, password, db;
     private String[]                      animals             = new String[] {};
     private String[]                      monsters            = new String[] {};
     private String[]                      waterAnimals        = new String[] {};
     private int                           mobSpawnRate        = 2;
+
+	private JSONAPIServer				  webUiServer;
+	private boolean						  webUi				  = false;
+	private int							  webUiPort			  = 20059;
+	private String						  webUiLoc			  = "webui-auth.txt";
+	private String						  webUiSalt			  = "";
+	private Map<String,String>			  webUiAuth			  = new HashMap<String,String>();
+
+	public  PipedInputStream			  stdoutStream;
+	public  InputStreamReaderThread		  stdout;
+	public  PipedOutputStream			  stdoutOutputStream;
+	public  PipedInputStream			  stderrStream;
+	public  InputStreamReaderThread		  stderr;
+	public  PipedOutputStream			  stderrOutputStream;
+	public  LineBasedInputStream		  stdin;
 
     private boolean                       mobReload           = false;
     private Class<?>[]                    animalsClass, monsterClass, waterAnimalsClass;
@@ -130,6 +155,26 @@ public class etc {
             }
 
         try {
+			if(stdout == null) {
+				stdoutStream = new PipedInputStream();
+				stdoutOutputStream = new PipedOutputStream(stdoutStream);
+				PrintStream origOut = System.out;
+				System.setOut(new PrintStream(stdoutOutputStream, true));
+
+				stderrStream = new PipedInputStream();
+				stderrOutputStream = new PipedOutputStream(stderrStream);
+				PrintStream origErr = System.err;
+				System.setErr(new PrintStream(stderrOutputStream, true));
+
+				//stdin = new LineBasedInputStream();
+				//System.setIn(stdin);
+
+				stdout = new InputStreamReaderThread(stdoutStream, origOut);
+				stdout.start();
+				stderr = new InputStreamReaderThread(stderrStream, origErr);
+				stderr.start();
+			}
+
             dataSourceType = properties.getString("data-source", "flatfile");
 
             loadIds(allowedItems, properties.getString("alloweditems", ""));
@@ -141,7 +186,13 @@ public class etc {
             whitelistEnabled = properties.getBoolean("whitelist", false);
             whitelistMessage = properties.getString("whitelist-message", "Not on whitelist.");
             reservelistEnabled = properties.getBoolean("reservelist", false);
+
+			webUi = properties.getBoolean("webui", false);
+			webUiPort = properties.getInt("webui-port", 20059);
+			webUiSalt = properties.getString("webui-salt", "");
+
             if (dataSourceType.equalsIgnoreCase("flatfile")) {
+				webUiLoc = properties.getString("webui-auth-file", "webui-auth.txt");
                 usersLoc = properties.getString("admintxtlocation", "users.txt");
                 kitsLoc = properties.getString("kitstxtlocation", "kits.txt");
                 homeLoc = properties.getString("homelocation", "homes.txt");
@@ -232,7 +283,73 @@ public class etc {
             dataSource = new MySQLSource();
 
         dataSource.initialize();
+
+		// need to create the JSONAPIServer ONLY after the auths have been loaded
+		loadWebUi();
     }
+
+	public void loadWebUi() {
+		if(webUi) {
+			try {
+				webUiServer = new JSONAPIServer(getWebUiAuths(), webUiPort);
+			}
+			catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	public String getWebUiLoc() {
+		return webUiLoc;
+	}
+
+	public int getWebUiPort () {
+		return webUiPort;
+	}
+
+	/**
+	 * Gets the salt used for hash generation.
+	 *
+	 * @return The salt, as written in server.properties as webui-salt.
+	 */
+	public String getWebUiSalt () {
+		return webUiSalt;
+	}
+
+	public Hashtable<String,String> getWebUiAuths () {
+		return getSource().getWebUiAuths();
+	}
+
+	/**
+	 * From a password, a number of iterations and a salt,
+	 * returns the corresponding digest
+	 * @param iterationNb int The number of iterations of the algorithm
+	 * @param password String The password to encrypt
+	 * @param salt byte[] The salt
+	 * @return byte[] The digested password
+	 * @throws NoSuchAlgorithmException If the algorithm doesn't exist
+	 */
+	public static String SHA256(String password) throws NoSuchAlgorithmException {
+		MessageDigest digest = MessageDigest.getInstance("SHA-256");
+		digest.reset();
+		byte[] input = null;
+		try {
+			input = digest.digest(password.getBytes("UTF-8"));
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		StringBuffer hexString = new StringBuffer();
+		for(int i = 0; i< input.length; i++) {
+			String hex = Integer.toHexString(0xFF & input[i]);
+			if (hex.length() == 1) {
+			    // could use a for loop, but we're only dealing with a single byte
+			    hexString.append('0');
+			}
+			hexString.append(hex);
+		}
+		return hexString.toString();
+	}
 
     public String getDataSourceType() {
         return dataSourceType;
