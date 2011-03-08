@@ -70,6 +70,7 @@ public class etc {
 
 	private JSONAPIServer				  webUiServer;
 	private boolean						  webUi				  = false;
+	private boolean						  webUiLogging		  = true;
 	private int							  webUiPort			  = 20059;
 	private String						  webUiLoc			  = "webui-auth.txt";
 	private String						  webUiSalt			  = "";
@@ -188,6 +189,7 @@ public class etc {
             reservelistEnabled = properties.getBoolean("reservelist", false);
 
 			webUi = properties.getBoolean("webui", false);
+			webUiLogging = properties.getBoolean("webui-logging", true);
 			webUiPort = properties.getInt("webui-port", 20059);
 			webUiSalt = properties.getString("webui-salt", "");
 
@@ -307,6 +309,14 @@ public class etc {
 		return webUiPort;
 	}
 
+	public boolean getWebUiEnabled () {
+		return webUi;
+	}
+
+	public boolean getWebUiShouldLog () {
+		return webUiLogging;
+	}
+
 	/**
 	 * Gets the salt used for hash generation.
 	 *
@@ -336,7 +346,6 @@ public class etc {
 		try {
 			input = digest.digest(password.getBytes("UTF-8"));
 		} catch (UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		StringBuffer hexString = new StringBuffer();

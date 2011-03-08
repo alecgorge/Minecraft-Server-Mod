@@ -34,7 +34,7 @@ public class JSONAPIServer extends NanoHTTPD {
 		etc.getLoader().addListener( PluginLoader.Hook.DISCONNECT, l, null, PluginListener.Priority.CRITICAL);
 		etc.getLoader().addListener( PluginLoader.Hook.LOGIN, l, null, PluginListener.Priority.CRITICAL);
 
-		outLog.info("WebUI Server: Running. ("+authTable.size()+" available username & password combinations)");
+		info("WebUI Server: Running. ("+authTable.size()+" available username & password combinations)");
 	}
 
 	public Object callMethod(String method, String[] signature, Object[] params) throws Exception {
@@ -71,16 +71,6 @@ public class JSONAPIServer extends NanoHTTPD {
 
 	}
 
-	public boolean methodExists (String method) {
-		/*for(Method m : methods.get(cat).getClass().getMethods()) {
-			if(m.getName().equals(method)) {
-				return true;
-			}
-		}*/
-
-		return true;
-	}
-
 	public boolean testLogin (String method, String hash) {
 		try {
 			boolean valid = false;
@@ -110,6 +100,12 @@ public class JSONAPIServer extends NanoHTTPD {
 		return callback.concat("(").concat(json).concat(")");
 	}
 
+	public void info (String log) {
+		if(etc.getInstance().getWebUiShouldLog()) {
+			outLog . info(log);
+		}
+	}
+
 	@Override
 	public Response serve( String uri, String method, Properties header, Properties parms )	{
 		String callback = parms.getProperty("callback");
@@ -125,7 +121,7 @@ public class JSONAPIServer extends NanoHTTPD {
 				return new NanoHTTPD.Response(HTTP_FORBIDDEN, MIME_JSON, callback(callback, r.toJSONString()));
 			}
 
-			outLog.info("[Streaming API] "+header.get("X-REMOTE-ADDR")+": source="+ source);
+			info("[Streaming API] "+header.get("X-REMOTE-ADDR")+": source="+ source);
 
 			try {
 				if(source == null)
@@ -159,6 +155,7 @@ public class JSONAPIServer extends NanoHTTPD {
 
 			// use basic authentication for other file access
 			// not the most secure but whatever...
+			// IMPORTANT all headers are lowercase
 			String authHeader = header.getProperty("authorization");
 
 			if (authHeader != null && !authHeader.equals("")) {
@@ -200,7 +197,7 @@ public class JSONAPIServer extends NanoHTTPD {
 				return r;
 			}
 
-			outLog.info("[WebUI] Serving file: "+uri);
+			info("[WebUI] Serving file: "+uri);
 
 			return serveFile(uri, header, new File("www/"), true);
 		}
@@ -216,7 +213,7 @@ public class JSONAPIServer extends NanoHTTPD {
 			JSONObject r = new JSONObject();
 			r.put("result", "error");
 			r.put("error", "Method doesn't exist!");
-			outLog.info("[API Call] "+header.get("X-REMOTE-ADDR")+": Method doesn't exist.");
+			info("[API Call] "+header.get("X-REMOTE-ADDR")+": Method doesn't exist.");
 			return new NanoHTTPD.Response( HTTP_NOTFOUND, MIME_JSON, callback(callback, r.toJSONString()));
 		}
 
@@ -226,12 +223,12 @@ public class JSONAPIServer extends NanoHTTPD {
 			JSONObject r = new JSONObject();
 			r.put("result", "error");
 			r.put("error", "Invalid API key.");
-			outLog.info("[API Call] "+header.get("X-REMOTE-ADDR")+": Invalid API Key.");
+			info("[API Call] "+header.get("X-REMOTE-ADDR")+": Invalid API Key.");
 			return new NanoHTTPD.Response(HTTP_FORBIDDEN, MIME_JSON, callback(callback, r.toJSONString()));
 		}
 
 
-		outLog.info("[API Call] "+header.get("X-REMOTE-ADDR")+": method="+ parms.getProperty("method").concat("?args=").concat((String) args));
+		info("[API Call] "+header.get("X-REMOTE-ADDR")+": method="+ parms.getProperty("method").concat("?args=").concat((String) args));
 
 		if(args == null || calledMethod == null) {
 			JSONObject r = new JSONObject();

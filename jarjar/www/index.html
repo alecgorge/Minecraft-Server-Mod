@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>hMod WebUI</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<link type="text/css" rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/themes/ui-lightness/jquery-ui.css" />
+		<link type="text/css" rel="stylesheet" href="/webui.css" />
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.10/jquery-ui.min.js"></script>
+		<script type="text/javascript" src="/sha_256.js" ></script>
+		<script type="text/javascript" src="/sprintf.js" ></script>
+		<script type="text/javascript" src="/webui.js" ></script>
+	</head>
+	<body>
+		<div id="wrapper">
+			<div id="header">
+				<h1>hMod WebUI</h1>
+			</div>
+			<div id="navigation">
+				<ul id="nav">
+					<li><a href="#">Server Status</a></li>
+					<li><a href="#">Server Console</a></li>
+					<li><a href="#">Player Management</a></li>
+					<li><a href="#">Edit Config Files</a></li>
+				</ul>
+				<br class="clear"/>
+			</div>
+			<div id="content">
+				<div class="gutter">
+					
+				</div>
+			</div>
+			<div id="footer">
+				<p>footer!</p>
+			</div>
+		</div>
+		<div id="forms">
+			<div id="login-form" title="Login to the hMod WebUI">
+				<p class="validateTips">Use any of the WebUI Authentication username and passwords.</p>
+
+				<form>
+					<fieldset>
+						<label for="username">Username</label>
+						<input type="text" name="username" id="username" class="text ui-widget-content ui-corner-all" />
+						<label for="password">Password</label>
+						<input type="text" name="password" id="password" value="" class="text ui-widget-content ui-corner-all" />
+						<label for="salt">Salt</label>
+						<input type="text" name="salt" id="salt" value="" class="text ui-widget-content ui-corner-all" />
+					</fieldset>
+				</form>
+			</div>		
+		</div>
+		<div id="progress-indicator">
+			<img src="/ajax-loader.gif" />
+		</div>
+		<!-- DO NOT REMOVE THIS. IT HOLDS *ALL* THE TRIGGERS AT RUNTIME -->
+		<div id="hMod"></div>
+	</body>
+</html>
