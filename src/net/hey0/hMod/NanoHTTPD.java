@@ -242,9 +242,10 @@ public class NanoHTTPD
 	 */
 	public static final String
 		MIME_PLAINTEXT = "text/plain",
+		MIME_CSS = "text/css",
 		MIME_HTML = "text/html",
 		MIME_DEFAULT_BINARY = "application/octet-stream",
-		MIME_JSON = "text/html";
+		MIME_JSON = "application/json";
 
 	// ==================================================
 	// Socket & server code
@@ -795,6 +796,7 @@ public class NanoHTTPD
 			"m3u		audio/mpeg-url " +
 			"pdf		application/pdf "+
 			"json		application/json " +
+			"css		text/css " +
 			"doc		application/msword "+
 			"ogg		application/x-ogg "+
 			"zip		application/octet-stream "+
