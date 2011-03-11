@@ -1,5 +1,5 @@
 $(function () {
-	$.fn.simpleTabs = function (linkWrapper,cb,cb2) {
+	$.fn.simpleTabs = function (linkWrapper,oclass,cb,cb2,cb3) {
 		var links = linkWrapper.find('a');
 		return this.each(function () {
 			var 	$this = $(this),
@@ -9,6 +9,8 @@ $(function () {
 			$children.hide().filter('#'+id).show();
 			if($children.filter(':visible').length < 1) {
 				$children.eq(0).show();
+				var a = $children.eq(0)[0];
+				cb.apply($('#'+a.id.substring(0,a.id.length-4)), [$children]);
 			}
 			else {
 				cb2.apply(this, [location.hash.substr(1)]);
@@ -17,10 +19,17 @@ $(function () {
 				$children.hide().filter('#'+this.id+"-tab").show();
 				cb.apply(this, [$children]);
 			});
+			oclass.live('click', function () {
+				$children.hide().filter(this.href.substr(this.href.indexOf('#'))+"-tab").show();
+				$(this.href.substr(this.href.indexOf('#'))).click();
+				if(typeof(cb3) == "function") {
+					cb3.apply(this, [$children]);
+				}
+			});
 		});
 	};
 	
-	$('.tabs').simpleTabs($('#nav'), function ($children) {
+	$('.tabs').simpleTabs($('#nav'), $('.tab-link'), function ($children) {
 		$(this).parents('ul').find('li').removeClass('active').end().end().parent().addClass('active');
 	}, function (id) {
 		$('#'+id).parents('ul').find('li').removeClass('active').end().end().parent().addClass('active');
@@ -34,8 +43,27 @@ $(function () {
 		},
 		password : "",
 		salt : "",
+
 		_baseApiCallFormat : "/api/call?method=%s&signature=%s&args=%s&key=%s",
+		_baseApiMultiCallFormat : "/api/call-multiple?method=%s&signature=%s&args=%s&key=%s",
 		_baseApiStreamFormat : "/api/subscribe?source=%s&key=%s",
+		_cache : {},
+		
+		set : function (k,v) {
+			if(typeof(k) == "object") {
+				_.map(k, function (v,k) {
+					$.hMod.set(k,v);
+				});
+				
+				return;
+			}
+			this._cache[k] = v;
+			return v;
+		},
+		
+		get : function (k) {
+			return this._cache[k];
+		},
 	
 		_jsonE : function (o) {
 			return JSON.stringify(o);
@@ -64,6 +92,9 @@ $(function () {
 		getHostUrl : function () {
 			return "http://"+this.host.hostname + ":" + this.host.port;
 		},
+		getPlayers : function (c) {
+			this.call({method:'etc.getServer.getPlayerList'}, c);
+		},
 	
 		boundCount : {},
 		bind : function (n,c) {
@@ -84,13 +115,24 @@ $(function () {
 			var method = o.method,
 				signature = o.signature || [],
 				args = o.args || [];
-			return this.getHostUrl()+sprintf(this._baseApiCallFormat, method, this._jsonE(signature), this._jsonE(args), this.makeKey(method));
+			return this.getHostUrl()+sprintf(this._baseApiCallFormat, encodeURIComponent(method), encodeURIComponent(this._jsonE(signature)), encodeURIComponent(this._jsonE(args)), this.makeKey(method));
+		},
+		makeAPIUrlMultiple : function (o) {
+			var method = o.method,
+				signature = o.signature || [],
+				args = o.args || [];
+			return this.getHostUrl()+sprintf(this._baseApiMultiCallFormat, encodeURIComponent(this._jsonE(method)), encodeURIComponent(this._jsonE(signature)), encodeURIComponent(this._jsonE(args)), this.makeKey(this._jsonE(method)));
 		},
 		makeAPIStreamUrl : function (o) {
 			var method = typeof(o) == "object" ? o.method : o;
-			return this.getHostUrl()+sprintf(this._baseApiCallFormat, method, this._jsonE(signature), this._jsonE(args), this.makeKey(method));
+			return this.getHostUrl()+sprintf(this._baseApiCallFormat, method, this.makeKey(method));
 		},
 		call : function (method, signature, args, callback) {
+			if((typeof(method) == "object" && typeof(method.method) == "object") || typeof(method) == "array") {
+				this.callMultiple(method, signature, args, callback);
+				return;
+			}
+		
 			var o = {};
 			if(typeof(method) == "object") {
 				o = method;
@@ -126,16 +168,63 @@ $(function () {
 				}
 			});
 		},
+		callMultiple : function(methods, signatures, args, callback) {
+			var o = {};
+			if(typeof(methods) == "object") {
+				o = methods;
+				callback = signatures;
+			}
+			else {
+				o = {
+					'method' : methods,
+					'signature' : signatures || [[]],
+					'args' : args || [[]],
+				};
+			}
+			var that = this;
+			$.get(this.makeAPIUrlMultiple(o), function (json,status,jqXHR) {
+				if(typeof(callback) == "object") {
+					_.map(json.success, function (v,k) {
+						callback[k].apply($.hMod, [v, status, jqXHR]);
+					});
+				}
+				else {
+					callback.apply($.hMod, [json, status, jqXHR]);
+				}
+			}).error(function (jqXHR) {
+				switch (jqXHR.status) {
+					case 403:
+						if(!that.trigger('hmod_403')) {
+							alert('Invalid username, password or salt!');
+						}
+						break;
+					case 500:
+						if(!that.trigger('hmod_500')) {
+							alert('Exception thrown!');
+						}
+						break;
+					case 404:
+						if(!that.trigger('hmod_404')) {					
+							alert("WTF? 404? That shouldn't happen...");
+						}
+						break;
+				}
+			});
+		},
 		subscribe : function (src, callbacks) {
 			// awesum timez websocketz here
 		},
 		makeKey : function (method) {
 			return SHA256(this.username+method+this.password+this.salt);
+		},
+		
+		playerLink : function (v) {
+			return sprintf('<a href="#player-management" class="player-link tab-link" rel="%s">%s</a>', v, v);
 		}
 	};
 	
 	$("#login-form").dialog({
-		autoOpen: false,
+		autoOpen: true,
 		height: 435,
 		width: 470,
 		modal: true,
@@ -154,7 +243,86 @@ $(function () {
 	});
 	
 	$.hMod.bind('hmod_ready', function () {
-		alert("READY");
+		// server status page
+		(function () {
+			var left = $('#status-left');
+			var right = $('#status-right');
+			
+			left.html('<br class="clear" />');
+			right.html('<br class="clear" />');
+			
+			var dl = {left:[], right:[]};
+			
+			this.call({
+				method: [
+					'etc.getInstance.getPlayerLimit',
+					'etc.getServer.getPlayerList',
+					'etc.getLoader.getPluginList',
+					'etc.getInstance.getVersion',
+					'etc.getInstance.getMotd'
+				],
+				args : [
+					[],
+					[],
+					[],
+					[],
+					[],
+					[]
+				],
+				signature : [
+					[],
+					[],
+					[],
+					[],
+					[],
+					[]
+				]
+			}, function (json) {
+				var v = {
+					player_limit : json.success[0].success,
+					players : json.success[1].success,
+					plugins : json.success[2].success,
+					version : json.success[3].success,
+					motd : json.success[4].success
+				};
+				
+				dl.left.push(["Players",  v.players.length + '/' + v.player_limit]);
+				dl.left.push(["Plugins", v.plugins]);
+				dl.left.push(["Version", v.version]);
+				dl.left.push(["MOTD", v.motd.join("<br/>")]);
+				
+				if(v.players.length == 0) {
+					dl.right.push(["Player", "No players are online."]);
+				}
+				else {
+					_.map(v.players, function (v) {
+						dl.right.push(["Player", $.hMod.playerLink(v.name)]);
+					});
+				}
+					
+				this.set(v);
+				
+				_.map(dl.left.reverse(), function (v) {
+					left.prepend(sprintf("<dt>%s</dt><dd>%s</dd>", v[0], v[1]));
+				});
+				
+				_.map(dl.right.reverse(), function (v) {
+					right.prepend(sprintf("<dt>%s</dt><dd>%s</dd>", v[0], v[1]));
+				});
+			});
+			
+			// this.getPlayers(function (json) {
+				// var players = this.set('players', json.success);
+				
+				// this.call({method:'etc.getInstance.getPlayerLimit'}, function (jso2n) {
+					// this.set('player_limit', jso2n.success);
+					
+					// dl.left.push(['Players', players.length.toString() + '/' + this.get('player_limit').toString()]);
+					
+
+				// });
+			// });
+		}).apply($.hMod);
 	});
 	
 	$('#progress-indicator')

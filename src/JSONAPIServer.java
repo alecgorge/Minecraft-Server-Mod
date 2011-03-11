@@ -8,21 +8,24 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.logging.Logger;
 import net.hey0.hMod.Base64Coder;
 import net.hey0.hMod.HttpStream;
 import net.hey0.hMod.NanoHTTPD;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONAware;
 
 import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
 
 public class JSONAPIServer extends NanoHTTPD {
 	Hashtable<String, String> logins = new Hashtable<String, String>();
-	Logger outLog = Logger.getLogger("Minecraft");
+	public static Logger outLog = Logger.getLogger("Minecraft");
 	Listener l = new Listener();
 
 	public JSONAPIServer(Hashtable<String,String> authTable, int port) throws IOException {
@@ -39,23 +42,6 @@ public class JSONAPIServer extends NanoHTTPD {
 
 	public Object callMethod(String method, String[] signature, Object[] params) throws Exception {
 		String[] parts = method.split("\\.");
-		String className = parts[0];
-		String methodName = null;
-		String parentMethodName = null;
-		if(parts.length > 2) {
-			methodName = parts[2];
-			parentMethodName = parts[1];
-		}
-		else {
-			methodName = parts[1];
-		}
-		Class c = Class.forName(parts[0]);
-		Object inst = null;
-
-		if(parentMethodName != null) {
-			inst = c.getMethod(parentMethodName, null).invoke(null, null);
-			c = inst.getClass();
-		}
 
 		Class<?>[] ps = new Class<?>[signature.length];
 		for(int i = 0; i< signature.length; i++) {
@@ -67,8 +53,21 @@ public class JSONAPIServer extends NanoHTTPD {
 			}
 		}
 
-		return c.getMethod(methodName, ps).invoke(parentMethodName != null ? inst : null, params);
+		Class c = Class.forName(parts[0]);
+		Object lastResult = new Object();
+		for(int i = 0; i < parts.length; i++) {
+			if(i == 0) {
+				lastResult = c.getMethod(parts[i+1], null).invoke(null, null);
+			}
+			else if(i == (parts.length - 1)) {
+				return lastResult;
+			}
+			else {
+				lastResult = lastResult.getClass().getMethod(parts[i+1], null).invoke(lastResult, null);
+			}
+		}
 
+		return lastResult;
 	}
 
 	public boolean testLogin (String method, String hash) {
@@ -115,10 +114,8 @@ public class JSONAPIServer extends NanoHTTPD {
 			String key = parms.getProperty("key");
 
 			if(!testLogin(source, key)) {
-				JSONObject r = new JSONObject();
-				r.put("result", "error");
-				r.put("error", "Invalid username/password.");
-				return new NanoHTTPD.Response(HTTP_FORBIDDEN, MIME_JSON, callback(callback, r.toJSONString()));
+				info("[API Call] "+header.get("X-REMOTE-ADDR")+": Invalid API Key.");
+				return jsonRespone(returnAPIError("Invalid API key."), callback, HTTP_FORBIDDEN);
 			}
 
 			info("[Streaming API] "+header.get("X-REMOTE-ADDR")+": source="+ source);
@@ -143,14 +140,11 @@ public class JSONAPIServer extends NanoHTTPD {
 				return new NanoHTTPD.Response( HTTP_OK, MIME_PLAINTEXT, out);
 			} catch (Exception e) {
 				e.printStackTrace();
-				JSONObject r = new JSONObject();
-				r.put("result", "error");
-				r.put("error", "That source doesn't exist!");
-				return new NanoHTTPD.Response( HTTP_NOTFOUND, MIME_JSON, callback(callback, r.toJSONString()));
+				return jsonRespone(returnAPIError("That source doesn't exist!"), callback, HTTP_NOTFOUND);
 			}
 		}
 
-		if(!uri.equals("/api/call")) {
+		if(!uri.equals("/api/call") && !uri.equals("/api/call-multiple")) {
 			boolean valid = false;
 
 			// use basic authentication for other file access
@@ -203,83 +197,114 @@ public class JSONAPIServer extends NanoHTTPD {
 		}
 		//System.out.println()
 
-		JSONParser parse = new JSONParser();
-
 		Object args = parms.getProperty("args","[]");
 		Object sig = parms.getProperty("signature","[]");
 		String calledMethod = (String)parms.getProperty("method");
 
 		if(calledMethod == null) {
-			JSONObject r = new JSONObject();
-			r.put("result", "error");
-			r.put("error", "Method doesn't exist!");
 			info("[API Call] "+header.get("X-REMOTE-ADDR")+": Method doesn't exist.");
-			return new NanoHTTPD.Response( HTTP_NOTFOUND, MIME_JSON, callback(callback, r.toJSONString()));
+			return jsonRespone(returnAPIError("Method doesn't exist!"), callback, HTTP_NOTFOUND);
 		}
 
 		String key = parms.getProperty("key");
-
 		if(!testLogin(calledMethod, key)) {
-			JSONObject r = new JSONObject();
-			r.put("result", "error");
-			r.put("error", "Invalid API key.");
 			info("[API Call] "+header.get("X-REMOTE-ADDR")+": Invalid API Key.");
-			return new NanoHTTPD.Response(HTTP_FORBIDDEN, MIME_JSON, callback(callback, r.toJSONString()));
+			return jsonRespone(returnAPIError("Invalid API key."), callback, HTTP_FORBIDDEN);
 		}
 
 
 		info("[API Call] "+header.get("X-REMOTE-ADDR")+": method="+ parms.getProperty("method").concat("?args=").concat((String) args));
 
 		if(args == null || calledMethod == null) {
-			JSONObject r = new JSONObject();
-			r.put("result", "error");
-			r.put("error", "You need to pass a method and an array of arguments.");
-			return new NanoHTTPD.Response( HTTP_NOTFOUND, MIME_JSON, callback(callback, r.toJSONString()));
+			return jsonRespone(returnAPIError("You need to pass a method and an array of arguments."), callback, HTTP_NOTFOUND);
 		}
 		else {
 			try {
+				JSONParser parse = new JSONParser();
 				args = parse.parse((String) args);
 				sig = parse.parse((String)sig);
-			} catch (ParseException e) {
-				e.printStackTrace();
-			}
-			if(args.getClass().getCanonicalName().endsWith("JSONArray")) {
-				//for(Object x : (ArrayList)args) {
-					try {
-						Object result = callMethod(calledMethod,
-								// TODO Make this suck less.
-								// ick, this is why I hate Java. maybe I am just doing it wrong...
-								(String[]) ((ArrayList) sig).toArray(new String[((ArrayList) sig).size()]),
-								(Object[]) ((ArrayList) args).toArray(new Object[((ArrayList) args).size()]));
-						/*if(result == null) {
-							JSONObject r = new JSONObject();
-							r.put("result", "error");
-							r.put("error", "You need to pass a valid method and an array of arguments.");
-							return new NanoHTTPD.Response( HTTP_NOTFOUND, MIME_JSON, callback(callback, r.toJSONString()));
-						}*/
-						JSONObject r = new JSONObject();
-						r.put("result", "success");
-						r.put("source", calledMethod);
-						r.put("success", result);
 
-						return new NanoHTTPD.Response( HTTP_OK, MIME_JSON, callback(callback, r.toJSONString()));
+				if(uri.equals("/api/call-multiple")) {
+					List<String> methods = new ArrayList<String>();
+					List<Object> arguments = new ArrayList<Object>();
+					List<Object> signatures = new ArrayList<Object>();
+					Object o = parse.parse(calledMethod);
+					if (o instanceof List && args instanceof List && sig instanceof List) {
+						methods = (List<String>)o;
+						arguments = (List<Object>)args;
+						signatures = (List<Object>)sig;
 					}
-					catch (Exception e) {
-						JSONObject r = new JSONObject();
-						r.put("result", "error");
-						StringWriter pw = new StringWriter();
-						e.printStackTrace(new PrintWriter( pw ));
-						e.printStackTrace();
-						r.put("error", "Caught exception: "+pw.toString());
-						return new NanoHTTPD.Response( HTTP_INTERNALERROR, MIME_JSON, callback(callback, r.toJSONString()));
+					else {
+						return jsonRespone(returnAPIException(new Exception("method, args and signature all need to be arrays for /api/call-multiple"), callback), callback);
 					}
-				//}
+
+					int size = methods.size();
+					JSONArray arr = new JSONArray();
+					for(int i = 0; i < size; i++) {
+						arr.add(serveAPICall(methods.get(i), (signatures.size()-1 >= i ? signatures.get(i) : new ArrayList<String>()), (arguments.size()-1 >= i ? arguments.get(i) : new ArrayList<Object>()), callback));
+					}
+
+					return jsonRespone(returnAPISuccess(o, arr), callback);
+				}
+				else {
+					return jsonRespone(serveAPICall(calledMethod, sig, args, callback), callback);
+				}
 			}
-			JSONObject r = new JSONObject();
-			r.put("result", "error");
-			r.put("error", "You need to pass a method and an array of arguments.");
-			return new NanoHTTPD.Response( HTTP_NOTFOUND, MIME_JSON, callback(callback, r.toJSONString()));
+			catch (Exception e) {
+				return jsonRespone(returnAPIException(e, callback), callback);
+			}
 		}
+	}
+
+	public JSONObject returnAPIException (Exception e, String callback) {
+		JSONObject r = new JSONObject();
+		r.put("result", "error");
+		StringWriter pw = new StringWriter();
+		e.printStackTrace(new PrintWriter( pw ));
+		e.printStackTrace();
+		r.put("error", "Caught exception: "+pw.toString());
+		return r;
+	}
+
+	public JSONObject returnAPIError (String error) {
+		JSONObject r = new JSONObject();
+		r.put("result", "error");
+		r.put("error", error);
+		return r;
+	}
+
+	public JSONObject returnAPISuccess (Object calledMethod, Object result) {
+		JSONObject r = new JSONObject();
+		r.put("result", "success");
+		r.put("source", calledMethod);
+		r.put("success", result);
+		return r;
+	}
+
+	public NanoHTTPD.Response jsonRespone (JSONAware o, String callback, String code) {
+		return new NanoHTTPD.Response(code, MIME_JSON, callback(callback, o.toJSONString()));
+	}
+
+	public NanoHTTPD.Response jsonRespone (JSONAware o, String callback) {
+		return jsonRespone(o, callback, HTTP_OK);
+	}
+
+	public JSONObject serveAPICall(String calledMethod, Object sig, Object args, String callback) {
+		try {
+			if(args.getClass().getCanonicalName().endsWith("JSONArray")) {
+				Object result = callMethod(calledMethod,
+						// TODO Make this suck less.
+						// ick, this is why I hate Java. maybe I am just doing it wrong...
+						(String[]) ((ArrayList) sig).toArray(new String[((ArrayList) sig).size()]),
+						(Object[]) ((ArrayList) args).toArray(new Object[((ArrayList) args).size()]));
+				return returnAPISuccess(calledMethod, result);
+			}
+		}
+		catch (Exception e) {
+			return returnAPIException(e, callback);
+		}
+
+		return returnAPIError("You need to pass a method and an array of arguments.");
 	}
 	
 	public class Listener extends PluginListener {

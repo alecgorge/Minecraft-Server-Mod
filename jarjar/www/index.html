@@ -28,7 +28,15 @@
 				<div id="content">
 					<div class="gutter">
 						<div class="tabs">
-							<div id="server-status-tab" class="tab">a</div>
+							<div id="server-status-tab" class="tab">
+								<div class="gutter">
+									<div class="split">
+										<div class="left"><h3>Status</h3><dl id="status-left"><br class="clear"/></dl></div>
+										<div class="right"><h3>Players</h3><dl id="status-right"><br class="clear"/></dl></div>
+										<br class="clear" />
+									</div>
+								</div>
+							</div>
 							<div id="server-console-tab" class="tab">b</div>
 							<div id="player-management-tab" class="tab">c</div>
 							<div id="config-editor-tab" class="tab">d</div>
@@ -36,7 +44,7 @@
 					</div>
 				</div>
 				<div id="footer">
-					<p>footer!</p>
+					<p>hMod WebUI by <a href="http://ramblingwood.com/">Alec Gorge</a></p>
 				</div>
 			</div>
 		</div>
@@ -47,9 +55,9 @@
 				<form>
 					<fieldset>
 						<label for="username">Username</label>
-						<input type="text" name="username" id="username" class="text ui-widget-content ui-corner-all" />
+						<input type="text" name="username" id="username" value="admin" class="text ui-widget-content ui-corner-all" />
 						<label for="password">Password</label>
-						<input type="password" name="password" id="password" value="" class="text ui-widget-content ui-corner-all" />
+						<input type="password" name="password" id="password" value="demo" class="text ui-widget-content ui-corner-all" />
 						<label for="salt">Salt</label>
 						<input type="password" name="salt" id="salt" value="" class="text ui-widget-content ui-corner-all" />
 						<label for="fqn">Host &amp; Port</label>

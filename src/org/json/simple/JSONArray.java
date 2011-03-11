@@ -54,6 +54,31 @@ public class JSONArray extends ArrayList implements List, JSONAware, JSONStreamA
 		}
 		out.write(']');
 	}
+
+	public static void writeJSONString(Object[] list, Writer out) throws IOException {
+		if(list == null) {
+			out.write("null");
+			return;
+		}
+
+		boolean first = true;
+
+        out.write('[');
+		for(Object value : list) {
+            if(first)
+                first = false;
+            else
+                out.write(',');
+
+			if(value == null){
+				out.write("null");
+				continue;
+			}
+
+			JSONValue.writeJSONString(value, out);
+		}
+		out.write(']');
+	}
 	
 	public void writeJSONString(Writer out) throws IOException{
 		writeJSONString(this, out);
@@ -84,6 +109,30 @@ public class JSONArray extends ArrayList implements List, JSONAware, JSONStreamA
                 sb.append(',');
             
 			Object value=iter.next();
+			if(value == null){
+				sb.append("null");
+				continue;
+			}
+			sb.append(JSONValue.toJSONString(value));
+		}
+        sb.append(']');
+		return sb.toString();
+	}
+	
+	public static String toJSONString(Object[] list) {
+		if(list == null)
+			return "null";
+		
+        boolean first = true;
+        StringBuffer sb = new StringBuffer();
+        
+        sb.append('[');
+		for(Object value : list) {
+            if(first)
+                first = false;
+            else
+                sb.append(',');
+            
 			if(value == null){
 				sb.append("null");
 				continue;

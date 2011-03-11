@@ -150,8 +150,17 @@ public class JSONValue {
 			JSONArray.writeJSONString((List)value, out);
             return;
 		}
+
+		if(value instanceof Object[]) {
+			JSONArray.writeJSONString((Object[])value, out);
+			return;
+		}
 		
-		out.write(value.toString());
+		writeJSONString(value.toString(), out);
+	}
+
+	public static void writeJSONString(Object[] value, Writer out) throws IOException {
+		writeJSONString(value, out);
 	}
 
 	/**
@@ -203,8 +212,15 @@ public class JSONValue {
 		
 		if(value instanceof List)
 			return JSONArray.toJSONString((List)value);
+
+		if(value instanceof Object[])
+			return JSONArray.toJSONString((Object[])value);
 		
-		return value.toString();
+		return toJSONString(value.toString());
+	}
+
+	public static String toJSONString(Object[] value) throws IOException {
+		return toJSONString(value);
 	}
 
 	/**
