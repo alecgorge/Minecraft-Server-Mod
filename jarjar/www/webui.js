@@ -111,21 +111,24 @@ $(function () {
 		validateLogin : function (callback) {
 			this.call({method: 'etc.getServer.getTime'}, callback);
 		},
-		makeAPIUrl : function (o) {
+		makeAPIUrl : function (o,x) {
 			var method = o.method,
 				signature = o.signature || [],
 				args = o.args || [];
-			return this.getHostUrl()+sprintf(this._baseApiCallFormat, encodeURIComponent(method), encodeURIComponent(this._jsonE(signature)), encodeURIComponent(this._jsonE(args)), this.makeKey(method));
+			return (x ? "" : this.getHostUrl())+sprintf(this._baseApiCallFormat, encodeURIComponent(method), encodeURIComponent(this._jsonE(signature)), encodeURIComponent(this._jsonE(args)), this.makeKey(method));
 		},
-		makeAPIUrlMultiple : function (o) {
+		makeAPIUrlMultiple : function (o,x) {
 			var method = o.method,
 				signature = o.signature || [],
 				args = o.args || [];
-			return this.getHostUrl()+sprintf(this._baseApiMultiCallFormat, encodeURIComponent(this._jsonE(method)), encodeURIComponent(this._jsonE(signature)), encodeURIComponent(this._jsonE(args)), this.makeKey(this._jsonE(method)));
+			return (x ? "" : this.getHostUrl())+sprintf(this._baseApiMultiCallFormat, encodeURIComponent(this._jsonE(method)), encodeURIComponent(this._jsonE(signature)), encodeURIComponent(this._jsonE(args)), this.makeKey(this._jsonE(method)));
 		},
-		makeAPIStreamUrl : function (o) {
+		makeAPIStreamUrl : function (o,x) {
 			var method = typeof(o) == "object" ? o.method : o;
-			return this.getHostUrl()+sprintf(this._baseApiCallFormat, method, this.makeKey(method));
+			return (x ? "" : this.getHostUrl())+sprintf(this._baseApiStreamFormat, method, this.makeKey(method));
+		},
+		webSocketUrl : function () {
+			return "ws://"+this.host.hostname + ":" + (this.host.port+1);
 		},
 		call : function (method, signature, args, callback) {
 			if((typeof(method) == "object" && typeof(method.method) == "object") || typeof(method) == "array") {
@@ -212,7 +215,33 @@ $(function () {
 			});
 		},
 		subscribe : function (src, callbacks) {
-			// awesum timez websocketz here
+			var socket = new WebSocket(this.webSocketUrl());
+
+			var that = this;
+			socket.onopen = function(evt) {
+				socket.send(that.makeAPIStreamUrl(src, true));
+			};
+
+			socket.onerror = function(evt) {
+				alert("error");
+				alert(evt);
+			};
+
+			socket.onmessage = function(evt) {
+				var data = JSON.parse(evt.data);
+				if(data.result == "error") {
+					socket.onerror(data.error);
+				}
+				else if(data.source == "console") {
+					callbacks["message"](data["data"]);
+				}
+			};
+
+			socket.onclose = function(evt) {
+				alert('Closed.');
+			};
+			
+			return socket;
 		},
 		makeKey : function (method) {
 			return SHA256(this.username+method+this.password+this.salt);
@@ -322,6 +351,39 @@ $(function () {
 
 				// });
 			// });
+		}).apply($.hMod);
+		
+		(function () {
+			var console = $("#console");
+			var input = $("#console-input");
+			
+			var appendToConsole = function (line) {
+				if(typeof(line) == "object") {
+					line = line["line"];
+				}
+				console.text($("#console").text()+line);
+				console[0].scrollTop = console[0].scrollHeight + 25;
+			};
+			var socket = this.subscribe("console", {message: appendToConsole});
+			
+			var sendMessage = function (txt) {
+				$.hMod.call({
+					method:"etc.getServer.useConsoleCommand",
+					signature: ["String"],
+					args: [txt]
+				}, function () {});
+				appendToConsole(txt+"\n");
+				input.val("");
+			};
+			
+			$("#console-send").click(function () {
+				sendMessage($("#console-input").val());
+			});
+			input.keydown(function (e) {
+				if((e.keyCode? e.keyCode : e.charCode) == 13) {
+					sendMessage($(this).val());
+				}
+			});
 		}).apply($.hMod);
 	});
 	

@@ -3,10 +3,8 @@ package net.hey0.hMod;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.TimeZone;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import org.json.simple.JSONObject;
@@ -24,21 +22,17 @@ public class HttpStream extends InputStream {
 	public ArrayList<String[]> stack = null;
 	public HashMap<String, Integer> stackCount = new HashMap<String, Integer>();
 	public String callback = "";
-	public static ConsoleHandler handler = null;
+	public static ConsoleHandler handler = new ConsoleHandler();
 
 	public HttpStream (String s, String callback) throws Exception {
 		type = s;
 		this.callback = callback;
 
-		if(handler == null) {
-			handler = new ConsoleHandler();
-		}
-
 		stack = getStack(type);
 		next = stack.size();
 	}
 
-	public class ConsoleHandler extends Handler {
+	public static class ConsoleHandler extends Handler {
 		public void publish (LogRecord r) {
 			HttpStream.log("console", new String[] {r.getMessage()});
 		}
@@ -56,7 +50,7 @@ public class HttpStream extends InputStream {
 		return (new Date()).getTime()/1000;
 	}
 
-	public static synchronized void log (String type, String[] event) {
+	public static void log (String type, String[] event) {
 		String[] newArgs = new String[event.length+1];
 		newArgs[0] = String.valueOf(getTimestamp());
 

@@ -37,7 +37,10 @@ public class JSONAPIServer extends NanoHTTPD {
 		etc.getLoader().addListener( PluginLoader.Hook.DISCONNECT, l, null, PluginListener.Priority.CRITICAL);
 		etc.getLoader().addListener( PluginLoader.Hook.LOGIN, l, null, PluginListener.Priority.CRITICAL);
 
-		info("WebUI Server: Running. ("+authTable.size()+" available username & password combinations)");
+		etc.getInstance().stdout.addHander(HttpStream.handler);
+		etc.getInstance().stderr.addHander(HttpStream.handler);
+
+		info("WebUI HTTP Server running on port " + port + ". ("+authTable.size()+" available username & password combinations)");
 	}
 
 	public Object callMethod(String method, String[] signature, Object[] params) throws Exception {
@@ -63,7 +66,7 @@ public class JSONAPIServer extends NanoHTTPD {
 				return lastResult;
 			}
 			else {
-				lastResult = lastResult.getClass().getMethod(parts[i+1], null).invoke(lastResult, null);
+				lastResult = lastResult.getClass().getMethod(parts[i+1], ps).invoke(lastResult, params);
 			}
 		}
 
@@ -99,9 +102,9 @@ public class JSONAPIServer extends NanoHTTPD {
 		return callback.concat("(").concat(json).concat(")");
 	}
 
-	public void info (String log) {
+	public void info (final String log) {
 		if(etc.getInstance().getWebUiShouldLog()) {
-			outLog . info(log);
+			outLog.info(log);
 		}
 	}
 
@@ -114,7 +117,7 @@ public class JSONAPIServer extends NanoHTTPD {
 			String key = parms.getProperty("key");
 
 			if(!testLogin(source, key)) {
-				info("[API Call] "+header.get("X-REMOTE-ADDR")+": Invalid API Key.");
+				info("[Streaming API] "+header.get("X-REMOTE-ADDR")+": Invalid API Key.");
 				return jsonRespone(returnAPIError("Invalid API key."), callback, HTTP_FORBIDDEN);
 			}
 
@@ -124,18 +127,8 @@ public class JSONAPIServer extends NanoHTTPD {
 				if(source == null)
 					throw new Exception();
 
-				boolean toAdd = false;
-				if(HttpStream.handler == null) {
-					toAdd = true;
-				}
-
 				// HttpStream.handler will now be non-null
 				HttpStream out = new HttpStream(source, callback);
-
-				if(toAdd) {
-					etc.getInstance().stdout.addHander(HttpStream.handler);
-					etc.getInstance().stderr.addHander(HttpStream.handler);
-				}
 
 				return new NanoHTTPD.Response( HTTP_OK, MIME_PLAINTEXT, out);
 			} catch (Exception e) {

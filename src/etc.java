@@ -69,9 +69,13 @@ public class etc {
     private int                           mobSpawnRate        = 2;
 
 	private JSONAPIServer				  webUiServer;
+	private JSONAPIWebSocketServer		  webUiWebSocketServer;
+	private JSONAPISocketServer			  webUiSocketServer;
 	private boolean						  webUi				  = false;
-	private boolean						  webUiLogging		  = true;
+	private boolean						  webUiLogging		  = false;
 	private int							  webUiPort			  = 20059;
+	private int							  webUiWebSocketPort  = 20060;
+	private int							  webUiSocketPort	  = 20061;
 	private String						  webUiLoc			  = "webui-auth.txt";
 	private String						  webUiSalt			  = "";
 	private Map<String,String>			  webUiAuth			  = new HashMap<String,String>();
@@ -170,9 +174,9 @@ public class etc {
 				//stdin = new LineBasedInputStream();
 				//System.setIn(stdin);
 
-				stdout = new InputStreamReaderThread(stdoutStream, origOut);
+				stdout = new InputStreamReaderThread(stdoutStream, stdoutOutputStream, origOut);
 				stdout.start();
-				stderr = new InputStreamReaderThread(stderrStream, origErr);
+				stderr = new InputStreamReaderThread(stderrStream, stderrOutputStream, origErr);
 				stderr.start();
 			}
 
@@ -189,8 +193,10 @@ public class etc {
             reservelistEnabled = properties.getBoolean("reservelist", false);
 
 			webUi = properties.getBoolean("webui", false);
-			webUiLogging = properties.getBoolean("webui-logging", true);
+			webUiLogging = properties.getBoolean("webui-logging", false);
 			webUiPort = properties.getInt("webui-port", 20059);
+			webUiWebSocketPort = properties.getInt("webui-websocket-port", 20060);
+			webUiSocketPort = properties.getInt("webui-socket-port", 20061);
 			webUiSalt = properties.getString("webui-salt", "");
 
             if (dataSourceType.equalsIgnoreCase("flatfile")) {
@@ -294,11 +300,26 @@ public class etc {
 		if(webUi) {
 			try {
 				webUiServer = new JSONAPIServer(getWebUiAuths(), webUiPort);
+				webUiWebSocketServer = new JSONAPIWebSocketServer(webUiWebSocketPort);
+				webUiWebSocketServer.start();
+				webUiSocketServer = new JSONAPISocketServer(webUiSocketPort);
 			}
 			catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
+	}
+
+	public JSONAPIServer getWebUiServer () {
+		return webUiServer;
+	}
+
+	public JSONAPIWebSocketServer getWebUiWebSocketServer () {
+		return webUiWebSocketServer;
+	}
+
+	public JSONAPISocketServer getWebUiSocketServer () {
+		return webUiSocketServer;
 	}
 
 	public String getWebUiLoc() {
@@ -307,6 +328,14 @@ public class etc {
 
 	public int getWebUiPort () {
 		return webUiPort;
+	}
+
+	public int getWebUiWebSocketPort () {
+		return webUiWebSocketPort;
+	}
+
+	public int getWebUiSocketPort () {
+		return webUiSocketPort;
 	}
 
 	public boolean getWebUiEnabled () {
